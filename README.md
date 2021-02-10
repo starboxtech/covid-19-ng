@@ -1,4 +1,5 @@
-# COVID-19-NG
+# Coronavirus Cases in Nigeria (COVID-19-NG)
+![Coronavirus (COVID-19) Cases in Nigeria](screenshot.jpg)
 
 ## Overview
 This is a data repository for cases on the 2019 Novel Coronavirus (COVID-19) in Nigeria. It is developed and maintained by StarBox Technologies Ltd. StarBox Technologies provides this website free for use as part of its commitment to help the Nigerian community in these unprecedented times.
@@ -8,8 +9,9 @@ This is not an official government repository nor is it sponsored by any governm
 This project is for informational purposes only, please contact the appropriate public health agencies for enquiries on the pandemic, personal health, testing and isolation.
 
 ## Built With
-- Bootstrap 4
 - PHP 7
+- jQuery 3
+- Bootstrap 4
 - Google Charts
 
 ## Data Sources

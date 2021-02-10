@@ -1,60 +1,83 @@
 <?php
 // General functions
 
-function redirect_to($location) {
+function redirect_to($location)
+{
     header('Location: ' . $location);
     exit;
 }
 
 // User auth functions
 
-function check_auth() {
+function check_auth()
+{
     echo
-    '<div class="check-auth">' . ($_SESSION['admin_username'] ?? "") . '<br>' . ($_SESSION['admin_name'] ?? "") . '<br>' . (date("H:i:s Y/m/d", $_SESSION['last_login']) ?? "") . '</div>';
+        '<div class="check-auth">' . ($_SESSION['admin_username'] ?? "") . '<br>' . ($_SESSION['admin_name'] ?? "") . '<br>' . (date("H:i:s Y/m/d", $_SESSION['last_login']) ?? "") . '</div>';
 }
 
-function set_maintenance() {
+function test_mode()
+{
+    $case = parse_url($_SERVER['REQUEST_URI'], PHP_URL_QUERY);
+    if ($case === 'test') {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+function set_maintenance()
+{
     global $maintenance;
+
     if ($maintenance === 'on') {
+        if (is_logged_in() || test_mode() === true) {
+            return false;
+        }
         redirect_to(MAINTENANCE_PAGE);
     }
 }
 
-function show_session_message() {
+function show_session_message()
+{
     if (isset($_SESSION['message'])) {
         echo '
         <div class="alert alert-info mt-4 p-3 bordered bordered-dark bordered-all shadowed" role="alert">
-        '. $_SESSION['message'] .'
+        ' . $_SESSION['message'] . '
         </div>
         ';
         unset($_SESSION['message']);
     }
 }
 
-function is_logged_in() {
+function is_logged_in()
+{
     return isset($_SESSION['admin_username']);
 }
 
-function require_login() {
+function require_login()
+{
     if (!is_logged_in()) {
         redirect_to(ADMIN_LOGIN);
     }
 }
 
-function admin_logout() {
+function admin_logout()
+{
     log_user_event('logout');
     unset_admin_session();
     redirect_to(ADMIN_LOGIN);
 }
 
-function unset_admin_session() {
+function unset_admin_session()
+{
     unset($_SESSION['admin_username']);
     unset($_SESSION['admin_name']);
     unset($_SESSION['last_login']);
     unset($_SESSION['message']);
 }
 
-function show_admin_panel() {
+function show_admin_panel()
+{
     if (is_logged_in()) {
         echo '
         <form method="post" action=""
@@ -71,7 +94,8 @@ function show_admin_panel() {
     }
 }
 
-function log_in_admin($log_in_details) {
+function log_in_admin($log_in_details)
+{
     global $db;
 
     $sql = "SELECT * FROM `admins` WHERE `username` = ";
@@ -79,13 +103,13 @@ function log_in_admin($log_in_details) {
     $query_result = mysqli_query($db, $sql);
     $admin_details = mysqli_fetch_assoc($query_result);
     mysqli_free_result($query_result);
-    
+
     if ($admin_details['username']) {
         $pass_verified = password_verify($log_in_details['password'], $admin_details['hashed_password']);
         if ($pass_verified) {
             session_regenerate_id();
             $_SESSION['admin_username'] = $admin_details['username'];
-            $_SESSION['admin_name'] = split_name($admin_details['name'],'first');
+            $_SESSION['admin_name'] = split_name($admin_details['name'], 'first');
             $_SESSION['last_login'] = time();
             log_user_event('login');
             redirect_to(ADMIN_ROOT);
@@ -99,13 +123,14 @@ function log_in_admin($log_in_details) {
     }
 }
 
-function create_new_admin($new_admin) {
+function create_new_admin($new_admin)
+{
     global $db;
 
     $password_hash = password_hash($new_admin['password'], PASSWORD_BCRYPT);
     $new_admin['hashed_password'] = $password_hash;
     unset($new_admin['password']);
-    
+
     $fields = '';
     foreach ($new_admin as $key => $value) {
         $fields .= "`" . $key . "`, ";
@@ -114,7 +139,7 @@ function create_new_admin($new_admin) {
 
     $values = '';
     foreach ($new_admin as $key => $value) {
-        $values .= "'" .  mysqli_real_escape_string($db, $value) . "', ";
+        $values .= "'" . mysqli_real_escape_string($db, $value) . "', ";
     }
     $values = rtrim($values, ", ");
 
@@ -125,25 +150,27 @@ function create_new_admin($new_admin) {
     $result = insert_into_db($sql);
     if ($result === true) {
         log_user_event('new user');
-        return "New user account created successfully<br>Database successfully backed up."; 
+        return "New user account created successfully<br>Database successfully backed up.";
     } else {
-        return  $result;
+        return $result;
     }
 }
 
 // Application data functions
 
-function world_stats() {
+function world_stats()
+{
     $world_stats = json_decode(file_get_contents('https://corona.lmao.ninja/v2/all'), true);
-    return $world_stats;  
+    return $world_stats;
 }
 
-function get_ncdc_latest() {
-    
+function get_ncdc_latest()
+{
+
     $curl = curl_init('https://covid19.ncdc.gov.ng/');
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 10); 
+    curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 10);
     curl_setopt($curl, CURLOPT_TIMEOUT, 10);
     curl_setopt($curl, CURLOPT_NOSIGNAL, 1);
     $html = curl_exec($curl);
@@ -157,23 +184,23 @@ function get_ncdc_latest() {
         $dom->loadHTML($html);
         // Get Cases table by ID
         $table = $dom->getElementById('custom1');
-        
+
         if (!empty($table)) {
-            foreach($table->getElementsByTagName('td') as $td) {
+            foreach ($table->getElementsByTagName('td') as $td) {
                 $row = $td->textContent;
                 // $output_html[] = explode("\n",$row);
                 $output_html[] = $row;
             }
-    
+
             // foreach ($output_html as $value) {
-                //     $raw_cases[] = trim($value[1]);
-                // }
-                
+            //     $raw_cases[] = trim($value[1]);
+            // }
+
             $raw_cases[0] = null;
             foreach ($output_html as $value) {
                 $raw_cases[] = trim($value);
             }
-    
+
             $i = 0;
             $y = 0;
             $j = 0;
@@ -212,7 +239,8 @@ function get_ncdc_latest() {
     return null;
 }
 
-function search_for_cases($val, $array) {
+function search_for_cases($val, $array)
+{
     foreach ($array as $value) {
         if ($value[0] === $val) {
             return $value[1];
@@ -221,32 +249,35 @@ function search_for_cases($val, $array) {
     return null;
 }
 
-function all_records() {
+function all_records()
+{
     global $db;
-    
+
     $sql = "SELECT * FROM `ncdc_time_series` ";
     $sql .= "ORDER BY `ncdc_date` ";
     $query_result = mysqli_query($db, $sql);
     $result_all = mysqli_fetch_all($query_result, MYSQLI_ASSOC);
     mysqli_free_result($query_result);
-    
+
     return $result_all;
 }
 
-function last_record() {
+function last_record()
+{
     global $db;
-    
+
     $sql = "SELECT * FROM `ncdc_time_series` ";
     $sql .= "ORDER BY `ncdc_date` DESC ";
     $sql .= "LIMIT 1 ";
     $query_result = mysqli_query($db, $sql);
     $result = mysqli_fetch_assoc($query_result);
     mysqli_free_result($query_result);
-    
+
     return $result;
 }
 
-function prev_day() {
+function prev_day()
+{
     global $db;
 
     $sql = "SELECT * FROM `ncdc_time_series` ";
@@ -256,26 +287,28 @@ function prev_day() {
     $query_result = mysqli_query($db, $sql);
     $result = mysqli_fetch_assoc($query_result);
     mysqli_free_result($query_result);
-    
+
     return $result;
 }
 
-function all_logs() {
+function all_logs()
+{
     global $db;
-    
+
     $sql = "SELECT * FROM `logs` ";
     $sql .= "ORDER BY `created_on` DESC ";
     $query_result = mysqli_query($db, $sql);
     $result_all = mysqli_fetch_all($query_result);
     mysqli_free_result($query_result);
-    
+
     return $result_all;
 }
 
-function get_this_record($id) {
+function get_this_record($id)
+{
     global $db;
-    
-    $id = explode('-',$id);
+
+    $id = explode('-', $id);
     $sql = "SELECT * FROM `ncdc_time_series` ";
     $sql .= "WHERE `ng_confirmed` = $id[0] ";
     $sql .= "AND `ng_deaths` = $id[1] ";
@@ -284,15 +317,16 @@ function get_this_record($id) {
     $query_result = mysqli_query($db, $sql);
     $result = mysqli_fetch_assoc($query_result);
     mysqli_free_result($query_result);
-    
-    if ($result['ng_confirmed'] == $id[0] && $result['ng_deaths'] == $id[1] &&$result['ng_recovered'] == $id[2]) {
+
+    if ($result['ng_confirmed'] == $id[0] && $result['ng_deaths'] == $id[1] && $result['ng_recovered'] == $id[2]) {
         return $result;
     } else {
         return null;
     }
 }
 
-function new_ncdc_time_series_record($record) {
+function new_ncdc_time_series_record($record)
+{
     global $db;
 
     $db_format = format_for_db($record, 'new');
@@ -312,13 +346,14 @@ function new_ncdc_time_series_record($record) {
     $result = insert_into_db($sql);
     if ($result === true) {
         log_user_event('new');
-        return "<div>New record created<br>Database successfully backed up.</div>"; 
-    }else {
-        return  $result;
+        return "<div>New record created<br>Database successfully backed up.</div>";
+    } else {
+        return $result;
     }
 }
 
-function update_ncdc_time_series_record($record) {
+function update_ncdc_time_series_record($record)
+{
     global $db;
 
     $db_format = format_for_db($record, 'update');
@@ -329,18 +364,19 @@ function update_ncdc_time_series_record($record) {
     }
     $sql = rtrim($sql, ', ');
     $sql .= " WHERE `ncdc_time_series_id` = '$record[ncdc_time_series_id]';";
-    
+
     // return $sql;
     $result = insert_into_db($sql);
     if ($result === true) {
         log_user_event('edit');
         return "<div>Record edited<br>Database successfully backed up.</div>";
-    }else {
+    } else {
         return $result;
     }
 }
 
-function delete_ncdc_time_series_record($record) {
+function delete_ncdc_time_series_record($record)
+{
     global $db;
 
     $sql = "DELETE FROM `ncdc_time_series` ";
@@ -350,13 +386,14 @@ function delete_ncdc_time_series_record($record) {
     $result = insert_into_db($sql);
     if ($result === true) {
         log_user_event('delete');
-        return "<div>Record deleted<br>Database successfully backed up.</div>"; 
+        return "<div>Record deleted<br>Database successfully backed up.</div>";
     } else {
-        return  $result;
+        return $result;
     }
 }
 
-function insert_into_db($sql) {
+function insert_into_db($sql)
+{
     global $db;
     if (mysqli_query($db, $sql)) {
         backup_db();
@@ -364,23 +401,25 @@ function insert_into_db($sql) {
     } else {
         $error = "Error: " . $sql . "<br>" . mysqli_error($db);
         return $error;
-    }    
+    }
     mysqli_close($db);
 }
 
-function backup_db() {
-    exec(SQL_PATH . ' --single-transaction --user=' . DB_USER . ' --password=' . DB_PASS . ' --host=' . DB_HOST . ' ' . DB_NAME .' | gzip  >' . BACKUP_FILE . ' 2>&1', $output);
+function backup_db()
+{
+    exec(SQL_PATH . ' --single-transaction --user=' . DB_USER . ' --password=' . DB_PASS . ' --host=' . DB_HOST . ' ' . DB_NAME . ' | gzip  >' . BACKUP_FILE . ' 2>&1', $output);
 
     return '<div>Database successfully backed up.</div>';
 }
 
-function get_ip_address(){
-    foreach (array('HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_FORWARDED', 'HTTP_X_CLUSTER_CLIENT_IP', 'HTTP_FORWARDED_FOR', 'HTTP_FORWARDED', 'REMOTE_ADDR') as $key){
-        if (array_key_exists($key, $_SERVER) === true){
-            foreach (explode(',', $_SERVER[$key]) as $ip){
-                $ip = trim($ip); 
+function get_ip_address()
+{
+    foreach (array('HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_FORWARDED', 'HTTP_X_CLUSTER_CLIENT_IP', 'HTTP_FORWARDED_FOR', 'HTTP_FORWARDED', 'REMOTE_ADDR') as $key) {
+        if (array_key_exists($key, $_SERVER) === true) {
+            foreach (explode(',', $_SERVER[$key]) as $ip) {
+                $ip = trim($ip);
 
-                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false){
+                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false) {
                     return $ip;
                 }
             }
@@ -390,7 +429,8 @@ function get_ip_address(){
 
 // Format data functions
 
-function format_for_db($record, $option = 'update') {
+function format_for_db($record, $option = 'update')
+{
     global $db;
 
     // Set 'last_modified' stamp
@@ -407,7 +447,7 @@ function format_for_db($record, $option = 'update') {
 
     foreach ($record as $key => $value) {
         // Handle integers, default to zero, put in quotes... e.g. '0'
-        if (substr($key,0,3) === 'ng_') {
+        if (substr($key, 0, 3) === 'ng_') {
             if ($value === '0' || $value === 0 || trim($value) == '') {
                 $f_record[$key] = "'" . 0 . "'";
             } else {
@@ -420,18 +460,19 @@ function format_for_db($record, $option = 'update') {
         }
         // Handle 'ncdc_date'
         if (isset($record['ncdc_date'])) {
-            $f_record['ncdc_date'] = "STR_TO_DATE('" . $record['ncdc_date'] ."', '%Y/%m/%d %H:%i')";
+            $f_record['ncdc_date'] = "STR_TO_DATE('" . $record['ncdc_date'] . "', '%Y/%m/%d %H:%i')";
         }
         // Handle other dates
         if (($key === 'created_on') || ($key === 'last_modified_on')) {
-            $f_record[$key] = "STR_TO_DATE('" . $value ."', '%Y/%m/%d %H:%i:%s')";
+            $f_record[$key] = "STR_TO_DATE('" . $value . "', '%Y/%m/%d %H:%i:%s')";
         }
     }
-    
+
     return $f_record;
 }
 
-function regions($param = null) {
+function regions($param = null)
+{
     if (isset($param)) {
         $last_record = get_this_record($param);
     } else {
@@ -439,53 +480,54 @@ function regions($param = null) {
     }
     $prev_day = prev_day();
     $regions = array(
-        ['FCT', (int)$last_record['ng_fc'], (int)$prev_day['ng_fc'], 'ng_fc'],
-        ['Abia', (int)$last_record['ng_ab'], (int)$prev_day['ng_ab'], 'ng_ab'],
-        ['Adamawa', (int)$last_record['ng_ad'], (int)$prev_day['ng_ad'], 'ng_ad'],
-        ['Akwa Ibom', (int)$last_record['ng_ak'], (int)$prev_day['ng_ak'], 'ng_ak'],
-        ['Anambra', (int)$last_record['ng_an'], (int)$prev_day['ng_an'], 'ng_an'],
-        ['Bauchi', (int)$last_record['ng_ba'], (int)$prev_day['ng_ba'], 'ng_ba'],
-        ['Bayelsa', (int)$last_record['ng_by'], (int)$prev_day['ng_by'], 'ng_by'],
-        ['Benue', (int)$last_record['ng_be'], (int)$prev_day['ng_be'], 'ng_be'],
-        ['Borno', (int)$last_record['ng_bo'], (int)$prev_day['ng_bo'], 'ng_bo'],
-        ['Cross River', (int)$last_record['ng_cr'], (int)$prev_day['ng_cr'], 'ng_cr'],
-        ['Delta', (int)$last_record['ng_de'], (int)$prev_day['ng_de'], 'ng_de'],
-        ['Ebonyi', (int)$last_record['ng_eb'], (int)$prev_day['ng_eb'], 'ng_eb'],
-        ['Edo', (int)$last_record['ng_ed'], (int)$prev_day['ng_ed'], 'ng_ed'],
-        ['Ekiti', (int)$last_record['ng_ek'], (int)$prev_day['ng_ek'], 'ng_ek'],
-        ['Enugu', (int)$last_record['ng_en'], (int)$prev_day['ng_en'], 'ng_en'],
-        ['Gombe', (int)$last_record['ng_go'], (int)$prev_day['ng_go'], 'ng_go'],
-        ['Imo', (int)$last_record['ng_im'], (int)$prev_day['ng_im'], 'ng_im'],
-        ['Jigawa', (int)$last_record['ng_ji'], (int)$prev_day['ng_ji'], 'ng_ji'],
-        ['Kaduna', (int)$last_record['ng_kd'], (int)$prev_day['ng_kd'], 'ng_kd'],
-        ['Kano', (int)$last_record['ng_kn'], (int)$prev_day['ng_kn'], 'ng_kn'],
-        ['Katsina', (int)$last_record['ng_kt'], (int)$prev_day['ng_kt'], 'ng_kt'],
-        ['Kebbi', (int)$last_record['ng_ke'], (int)$prev_day['ng_ke'], 'ng_ke'],
-        ['Kogi', (int)$last_record['ng_ko'], (int)$prev_day['ng_ko'], 'ng_ko'],
-        ['Kwara', (int)$last_record['ng_kw'], (int)$prev_day['ng_kw'], 'ng_kw'],
-        ['Lagos', (int)$last_record['ng_la'], (int)$prev_day['ng_la'], 'ng_la'],
-        ['Nasarawa', (int)$last_record['ng_na'], (int)$prev_day['ng_na'], 'ng_na'],
-        ['Niger', (int)$last_record['ng_ni'], (int)$prev_day['ng_ni'], 'ng_ni'],
-        ['Ogun', (int)$last_record['ng_og'], (int)$prev_day['ng_og'], 'ng_og'],
-        ['Ondo', (int)$last_record['ng_on'], (int)$prev_day['ng_on'], 'ng_on'],
-        ['Osun', (int)$last_record['ng_os'], (int)$prev_day['ng_os'], 'ng_os'],
-        ['Oyo', (int)$last_record['ng_oy'], (int)$prev_day['ng_oy'], 'ng_oy'],
-        ['Plateau', (int)$last_record['ng_pl'], (int)$prev_day['ng_pl'], 'ng_pl'],
-        ['Rivers', (int)$last_record['ng_ri'], (int)$prev_day['ng_ri'], 'ng_ri'],
-        ['Sokoto', (int)$last_record['ng_so'], (int)$prev_day['ng_so'], 'ng_so'],
-        ['Taraba', (int)$last_record['ng_ta'], (int)$prev_day['ng_ta'], 'ng_ta'],
-        ['Yobe', (int)$last_record['ng_yo'], (int)$prev_day['ng_yo'], 'ng_yo'],
-        ['Zamfara', (int)$last_record['ng_za'], (int)$prev_day['ng_za'], 'ng_za']
+        ['FCT', (int) $last_record['ng_fc'], (int) $prev_day['ng_fc'], 'ng_fc'],
+        ['Abia', (int) $last_record['ng_ab'], (int) $prev_day['ng_ab'], 'ng_ab'],
+        ['Adamawa', (int) $last_record['ng_ad'], (int) $prev_day['ng_ad'], 'ng_ad'],
+        ['Akwa Ibom', (int) $last_record['ng_ak'], (int) $prev_day['ng_ak'], 'ng_ak'],
+        ['Anambra', (int) $last_record['ng_an'], (int) $prev_day['ng_an'], 'ng_an'],
+        ['Bauchi', (int) $last_record['ng_ba'], (int) $prev_day['ng_ba'], 'ng_ba'],
+        ['Bayelsa', (int) $last_record['ng_by'], (int) $prev_day['ng_by'], 'ng_by'],
+        ['Benue', (int) $last_record['ng_be'], (int) $prev_day['ng_be'], 'ng_be'],
+        ['Borno', (int) $last_record['ng_bo'], (int) $prev_day['ng_bo'], 'ng_bo'],
+        ['Cross River', (int) $last_record['ng_cr'], (int) $prev_day['ng_cr'], 'ng_cr'],
+        ['Delta', (int) $last_record['ng_de'], (int) $prev_day['ng_de'], 'ng_de'],
+        ['Ebonyi', (int) $last_record['ng_eb'], (int) $prev_day['ng_eb'], 'ng_eb'],
+        ['Edo', (int) $last_record['ng_ed'], (int) $prev_day['ng_ed'], 'ng_ed'],
+        ['Ekiti', (int) $last_record['ng_ek'], (int) $prev_day['ng_ek'], 'ng_ek'],
+        ['Enugu', (int) $last_record['ng_en'], (int) $prev_day['ng_en'], 'ng_en'],
+        ['Gombe', (int) $last_record['ng_go'], (int) $prev_day['ng_go'], 'ng_go'],
+        ['Imo', (int) $last_record['ng_im'], (int) $prev_day['ng_im'], 'ng_im'],
+        ['Jigawa', (int) $last_record['ng_ji'], (int) $prev_day['ng_ji'], 'ng_ji'],
+        ['Kaduna', (int) $last_record['ng_kd'], (int) $prev_day['ng_kd'], 'ng_kd'],
+        ['Kano', (int) $last_record['ng_kn'], (int) $prev_day['ng_kn'], 'ng_kn'],
+        ['Katsina', (int) $last_record['ng_kt'], (int) $prev_day['ng_kt'], 'ng_kt'],
+        ['Kebbi', (int) $last_record['ng_ke'], (int) $prev_day['ng_ke'], 'ng_ke'],
+        ['Kogi', (int) $last_record['ng_ko'], (int) $prev_day['ng_ko'], 'ng_ko'],
+        ['Kwara', (int) $last_record['ng_kw'], (int) $prev_day['ng_kw'], 'ng_kw'],
+        ['Lagos', (int) $last_record['ng_la'], (int) $prev_day['ng_la'], 'ng_la'],
+        ['Nasarawa', (int) $last_record['ng_na'], (int) $prev_day['ng_na'], 'ng_na'],
+        ['Niger', (int) $last_record['ng_ni'], (int) $prev_day['ng_ni'], 'ng_ni'],
+        ['Ogun', (int) $last_record['ng_og'], (int) $prev_day['ng_og'], 'ng_og'],
+        ['Ondo', (int) $last_record['ng_on'], (int) $prev_day['ng_on'], 'ng_on'],
+        ['Osun', (int) $last_record['ng_os'], (int) $prev_day['ng_os'], 'ng_os'],
+        ['Oyo', (int) $last_record['ng_oy'], (int) $prev_day['ng_oy'], 'ng_oy'],
+        ['Plateau', (int) $last_record['ng_pl'], (int) $prev_day['ng_pl'], 'ng_pl'],
+        ['Rivers', (int) $last_record['ng_ri'], (int) $prev_day['ng_ri'], 'ng_ri'],
+        ['Sokoto', (int) $last_record['ng_so'], (int) $prev_day['ng_so'], 'ng_so'],
+        ['Taraba', (int) $last_record['ng_ta'], (int) $prev_day['ng_ta'], 'ng_ta'],
+        ['Yobe', (int) $last_record['ng_yo'], (int) $prev_day['ng_yo'], 'ng_yo'],
+        ['Zamfara', (int) $last_record['ng_za'], (int) $prev_day['ng_za'], 'ng_za'],
     );
     return $regions;
 }
 
-function no_of_states() {
+function no_of_states()
+{
     $states = regions();
     $i = 0;
-    foreach ($states as  $value) {
+    foreach ($states as $value) {
         if ($value[1] === 0) {
-           continue;
+            continue;
         }
         $i++;
     }
@@ -493,107 +535,120 @@ function no_of_states() {
     return $i;
 }
 
-function country_confirmed_diff() {
+function country_confirmed_diff()
+{
     global $last_record;
     global $prev_day;
     $result = $last_record['ng_confirmed'] - $prev_day['ng_confirmed'];
     return $result;
 }
 
-function country_recovered_diff() {
+function country_recovered_diff()
+{
     global $last_record;
     global $prev_day;
     $result = $last_record['ng_recovered'] - $prev_day['ng_recovered'];
     return $result;
 }
 
-function country_deaths_diff() {
+function country_deaths_diff()
+{
     global $last_record;
     global $prev_day;
     $result = $last_record['ng_deaths'] - $prev_day['ng_deaths'];
     return $result;
 }
 
-function country_active_diff() {
+function country_active_diff()
+{
     global $last_record;
     global $prev_day;
-    $result = $last_record['ng_active'] - $prev_day['ng_active'];  
+    $result = $last_record['ng_active'] - $prev_day['ng_active'];
     return $result;
 }
 
-function percent_deaths() {
+function percent_deaths()
+{
     global $last_record;
     $result = round(($last_record['ng_deaths'] / $last_record['ng_confirmed']) * 100, 1);
     $result .= '%';
     return $result;
 }
 
-function percent_recovered() {
+function percent_recovered()
+{
     global $last_record;
     $result = round(($last_record['ng_recovered'] / $last_record['ng_confirmed']) * 100, 1);
     $result .= '%';
     return $result;
 }
 
-function percent_active() {
+function percent_active()
+{
     global $last_record;
     $result = round(($last_record['ng_active'] / $last_record['ng_confirmed']) * 100, 1);
     $result .= '%';
     return $result;
 }
 
-function disp_region_if_cases() {
+function disp_region_if_cases()
+{
     $regions = regions();
     foreach ($regions as $region) {
         if ($region[1] > 0) {
             $result[] = [$region[0], $region[1], $region[2]];
-        } 
+        }
     }
-    usort($result, function($a, $b) {
+    usort($result, function ($a, $b) {
         return $b[1] <=> $a[1];
     });
 
     return $result;
 }
 
-function fdate_index() {
+function fdate_index()
+{
     global $last_record;
 
-    $result = new DateTime($last_record['ncdc_date']); 
-    $result = $result -> sub(new DateInterval('PT1H')); // Offset back to UTC
-    $result = $result -> format(DATE_ISO8601);
+    $result = new DateTime($last_record['ncdc_date']);
+    $result = $result->sub(new DateInterval('PT1H')); // Offset back to UTC
+    $result = $result->format(DATE_ISO8601);
     return $result;
 }
 
-function fdate_datepicker($date) {
-    $result = new DateTime($date); 
-    $result = $result -> format('Y/m/d H:i');
+function fdate_datepicker($date)
+{
+    $result = new DateTime($date);
+    $result = $result->format('Y/m/d H:i');
     return $result;
 }
 
-function fdate_words($date) {
-    $result = new DateTime($date); 
-    $result = $result -> format('j M Y H:i');
+function fdate_words($date)
+{
+    $result = new DateTime($date);
+    $result = $result->format('j M Y H:i');
     return $result;
 }
 
-function fdate_db($date) {
-    $result = new DateTime($date); 
-    $result = $result -> format('Y/m/d H:i:s');
+function fdate_db($date)
+{
+    $result = new DateTime($date);
+    $result = $result->format('Y/m/d H:i:s');
     return $result;
 }
 
-function show_diff($param, $color = 'warning') {
+function show_diff($param, $color = 'warning')
+{
     $result = null;
     if ($param > 0) {
         if ($param > 1000) {
-            $param = round(($param/1000),1);
+            $param = round(($param / 1000), 1);
             $param .= 'k';
         }
         $result = '<span class="badge badge-' . $color . '">+' . $param . '</span>';
     } elseif ($param < 0) {
         if ($param < -1000) {
-            $param = round(($param/1000),1);
+            $param = round(($param / 1000), 1);
             $param .= 'k';
         }
         $result = '<span class="badge badge-success">' . $param . '</span>';
@@ -601,13 +656,14 @@ function show_diff($param, $color = 'warning') {
     return $result;
 }
 
-function split_name($full_name, $options = null) {
+function split_name($full_name, $options = null)
+{
     $full_name_array = explode(" ", $full_name);
 
     $first = $full_name_array[0];
     if (count($full_name_array) > 1) {
         $last = end($full_name_array);
-        if (count($full_name_array) > 2)  {
+        if (count($full_name_array) > 2) {
             $middle = implode(' ', array_slice($full_name_array, 1, -1));
         }
     }
@@ -640,7 +696,8 @@ function split_name($full_name, $options = null) {
     }
 }
 
-function log_user_event($event = null){
+function log_user_event($event = null)
+{
     global $db;
     $user = $_SESSION['admin_username'] ?? "unknown";
     $ip_address = get_ip_address() ?? "";
@@ -651,7 +708,7 @@ function log_user_event($event = null){
     } else {
         $timestamp = 'now';
     }
-    $date1 = new DateTime ($timestamp);
+    $date1 = new DateTime($timestamp);
     $date2 = new DateTime('now');
     $diff = $date2->diff($date1);
     $date_diff = $diff->format('%h hrs %i mins');
@@ -683,23 +740,23 @@ function log_user_event($event = null){
             break;
     }
     $log = array('ip_address' => $ip_address, 'user' => $user, 'event' => $event);
-    
+
     $fields = '`created_on`, ';
     foreach ($log as $key => $value) {
         $fields .= "`" . $key . "`, ";
     }
     $fields = rtrim($fields, ", ");
 
-    $values = "STR_TO_DATE('" . mysqli_real_escape_string($db, fdate_db('now')) ."', '%Y/%m/%d %H:%i:%s'), ";
+    $values = "STR_TO_DATE('" . mysqli_real_escape_string($db, fdate_db('now')) . "', '%Y/%m/%d %H:%i:%s'), ";
     foreach ($log as $key => $value) {
-        $values .= "'" .  mysqli_real_escape_string($db, $value) . "', ";
+        $values .= "'" . mysqli_real_escape_string($db, $value) . "', ";
     }
     $values = rtrim($values, ", ");
 
     $sql = "INSERT into `logs` ( ";
     $sql .= $fields . " ) ";
     $sql .= "values ( " . $values . " ); ";
-    
+
     // return $sql;
     insert_into_db($sql);
 }
