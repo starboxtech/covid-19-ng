@@ -1,6 +1,6 @@
 # Coronavirus Cases in Nigeria (COVID-19-NG)
 Website development project for COVID-19 Available at:
-[https://covid19.starboxtech.com/?test](https://covid19.starboxtech.com/?test)
+[https://covid19.starboxtech.com/](https://covid19.starboxtech.com/)
 
 ![Coronavirus (COVID-19) Cases in Nigeria](screenshot.jpg)
 
